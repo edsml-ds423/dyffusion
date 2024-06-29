@@ -235,6 +235,7 @@ class PhysicalSystemsBenchmarkDataModule(BaseDataModule):
                 trajectories[condition_name] = extra_fixed_mask
                 trajectories["metadata"] = traj_metadata
             else:
+                # accumulate trajectories {} by adding to the previous ith entry.
                 trajectories["dynamics"] = np.concatenate([trajectories["dynamics"], dynamics_i], axis=0)
                 trajectories[condition_name] = np.concatenate([trajectories[condition_name], extra_fixed_mask], axis=0)
                 trajectories["metadata"] = trajectories["metadata"] + traj_metadata
