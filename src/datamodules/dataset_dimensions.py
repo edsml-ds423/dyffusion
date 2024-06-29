@@ -5,7 +5,8 @@ def get_dims_of_dataset(datamodule_config: DictConfig):
     """Returns the number of features for the given dataset."""
     target = datamodule_config.get("_target_", datamodule_config.get("name"))
     conditional_dim = 0
-    if "oisstv2" in target:
+    #TODO: group SST and imerg together - gridded data.
+    if "oisstv2" or "imerg_precipitation" in target:
         box_size = datamodule_config.box_size
         input_dim, output_dim, spatial_dims = 1, 1, (box_size, box_size)
     elif "physical_systems_benchmark" in target:
