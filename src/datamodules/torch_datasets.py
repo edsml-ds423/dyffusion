@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+from collections.abc import Sequence
 from typing import Dict, Sequence, Tuple
 
 import numpy as np
@@ -16,13 +18,21 @@ class MyTensorDataset(Dataset[Dict[str, Tensor]]):
     Args:
         *tensors (Tensor): tensors that have the same size of the first dimension.
     """
+
     tensors: Dict[str, Tensor]
 
+    @staticmethod
+    def convert_to_tensor(item):
+        key, tensor = item
+        if isinstance(tensor, np.ndarray):
+            return key, torch.from_numpy(tensor).float()
+        return key, tensor
+
     def __init__(self, tensors: Dict[str, Tensor] | Dict[str, np.ndarray], dataset_id: str = ""):
-        tensors = {
-            key: torch.from_numpy(tensor.copy()).float() if isinstance(tensor, np.ndarray) else tensor
-            for key, tensor in tensors.items()
-        }
+        # create a {key: tensor} from {key: numpy} dict.
+        with ThreadPoolExecutor() as executor:
+            tensors = dict(executor.map(self.convert_to_tensor, tensors.items()))
+
         any_tensor = next(iter(tensors.values()))
         self.dataset_size = any_tensor.size(0)
         for k, value in tensors.items():
@@ -39,7 +49,27 @@ class MyTensorDataset(Dataset[Dict[str, Tensor]]):
         self.dataset_id = dataset_id
 
     def __getitem__(self, index):
-        return {key: tensor[index] for key, tensor in self.tensors.items()}
+        # TODO: debug printing - REMOVE
+        print(f"--> MyTensorDataset.__getitem__({index})")
+        A = {key: tensor[index] for key, tensor in self.tensors.items()}
+
+        # TODO: remove this.
+        # save a plot of the index sample.
+        import matplotlib.pyplot as plt
+
+        fig, axs = plt.subplots(1, 5, figsize=(12, 5))
+        plt.rcParams.update({"font.size": 8})
+        axs[0].imshow(A["dynamics"][0, 0, :, :])
+        axs[1].imshow(A["dynamics"][2, 0, :, :])
+        axs[2].imshow(A["dynamics"][4, 0, :, :])
+        axs[3].imshow(A["dynamics"][6, 0, :, :])
+        axs[4].imshow(A["dynamics"][8, 0, :, :])
+        axs[4].set_title("x0+h (h=8)")
+        axs[0].set_title("x0")
+        plt.savefig(f"misc_images/interp_input_seq_{index}.png")
+
+        return A
+        # return {key: tensor[index] for key, tensor in self.tensors.items()}
 
     def __len__(self):
         return self.dataset_size
