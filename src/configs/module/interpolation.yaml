@@ -12,7 +12,7 @@ module:
   stack_window_to_channel_dim: True
 
 datamodule:
-  horizon: 7   # needs to be > 1
+  horizon: 8  # needs to be > 1
   multi_horizon: True
 
 model:
