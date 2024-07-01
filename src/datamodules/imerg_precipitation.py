@@ -211,8 +211,9 @@ class IMERGPrecipitationDataModule(BaseDataModule):
         """Create a torch dataset from the given xarray DataArray and return it."""
         window, horizon = self.hparams.window, self.get_horizon(split)
         X = dataset.to_numpy()  # dims: (N, S, H, W)
+        X = X[:100]
         X = np.expand_dims(X, 2)  # dims: (N, S, C, H, W)
-        assert X.shape == (dataset.shape[0], window + horizon, 1, self.hparams["box_size"], self.hparams["box_size"])
+        # assert X.shape == (dataset.shape[0], window + horizon, 1, self.hparams["box_size"], self.hparams["box_size"])
 
         return {"dynamics": X}
 

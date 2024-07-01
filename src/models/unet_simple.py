@@ -166,32 +166,32 @@ class UNet(BaseModel):
         # Encoder ops
         x = self.init_conv(x)
         x = self.dropout_input(x)
-        print("\n*** ENCODER ***")
+        # print("\n*** ENCODER ***")
         for op in self.input_ops:
-            print(f"--> x: {x.shape}, t: {time.shape}, op(x, time) = {op(x, time).shape}")
+            # print(f"--> x: {x.shape}, t: {time.shape}, op(x, time) = {op(x, time).shape}")
             x = op(x, time)
             skip_connections.append(x)
         # Decoder ops
         x = skip_connections.pop()
-        print("\n*** DECODER ***")
+        # print("\n*** DECODER ***")
         for op in self.output_ops:
             x = op(x, time)
             if skip_connections:
-                print(f"--> x: {x.shape}, skip_conn: {skip_connections[-1].shape}")
+                # print(f"--> x: {x.shape}, skip_conn: {skip_connections[-1].shape}")
                 x = torch.cat([x, skip_connections.pop()], dim=1)
         
         x = self.readout(x)
-        print(f"\n--> output (self.readout(x)): {x.shape}")
+        # print(f"\n--> output (self.readout(x)): {x.shape}")
         return x
 
     def forward(self, inputs, time=None, condition=None, return_time_emb: bool = False, **kwargs):
         # Preprocess inputs for shape
-        print("\n\n** UNet.forward() **\n")
-        print(f"*** inputs {inputs.shape} ***")
-        if condition:
-            print(f"\ntime = {time.item()}, condition shape: {condition.shape}")
-        else:
-            print(f"\ntime = {time.item()}")
+        # print("\n\n** UNet.forward() **\n")
+        # print(f"*** inputs {inputs.shape} ***")
+        # if condition:
+        #     print(f"\ntime = {time.item()}, condition shape: {condition.shape}")
+        # else:
+        #     print(f"\ntime = {time.item()}")
 
         if self.num_conditional_channels > 0:
             x = torch.cat([inputs, condition], dim=1)
@@ -199,7 +199,7 @@ class UNet(BaseModel):
             x = inputs
             assert condition is None
 
-        print(f"*** x input dims: {x.shape} ***")
+        # print(f"*** x input dims: {x.shape} ***")
 
         t = self.time_emb_mlp(time) if exists(self.time_emb_mlp) else None
 
@@ -207,19 +207,19 @@ class UNet(BaseModel):
         orig_x_shape = x.shape[-2:]
         x = self.upsampler(x)
         y = self._apply_ops(x, t)
-        print(f"--> y (non-interpolated) --> {y.shape}")
-        print(f"--> y (interpolated) --> {torch.nn.functional.interpolate(y, size=orig_x_shape, mode=self.outer_sample_mode).shape}")
+        # print(f"--> y (non-interpolated) --> {y.shape}")
+        # print(f"--> y (interpolated) --> {torch.nn.functional.interpolate(y, size=orig_x_shape, mode=self.outer_sample_mode).shape}")
         y = torch.nn.functional.interpolate(y, size=orig_x_shape, mode=self.outer_sample_mode)
 
-        import matplotlib.pyplot as plt
-        fig, axs = plt.subplots(1, 3, figsize=(9, 5))
-        plt.rcParams.update({"font.size": 8})
-        axs[0].imshow(inputs[0, 0, :, :])
-        axs[1].imshow(y[0, 0, :, :].detach().cpu())
-        axs[2].imshow(inputs[0, 1, :, :])
-        axs[0].set_title("x0")
-        axs[1].set_title(f"interpolated t={time.item()}")
-        axs[2].set_title("x0+h (h=8)")
-        plt.savefig(f"misc_images/iterp_img_t{time.item()}.png")
+        # import matplotlib.pyplot as plt
+        # fig, axs = plt.subplots(1, 3, figsize=(9, 5))
+        # plt.rcParams.update({"font.size": 8})
+        # axs[0].imshow(inputs[0, 0, :, :])
+        # axs[1].imshow(y[0, 0, :, :].detach().cpu())
+        # axs[2].imshow(inputs[0, 1, :, :])
+        # axs[0].set_title("x0")
+        # axs[1].set_title(f"interpolated t={time.item()}")
+        # axs[2].set_title("x0+h (h=8)")
+        # plt.savefig(f"misc_images/iterp_img_t{time.item()}.png")
 
         return y
