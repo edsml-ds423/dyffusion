@@ -13,6 +13,11 @@ from src.models.modules.net_norm import PreNorm
 from src.utilities.utils import default, exists
 
 
+#TODO: remove this.
+# temp _print flag (for debugging).
+_print = False
+
+
 def Upsample(dim, dim_out=None):
     return nn.Sequential(
         nn.Upsample(scale_factor=2, mode="nearest"), nn.Conv2d(dim, default(dim_out, dim), 3, padding=1)
@@ -264,12 +269,13 @@ class Unet(BaseModel):
         return self.get_block(self.hparams.dim, self.hparams.dim, dropout=dropout)
 
     def forward(self, x, time=None, condition=None, return_time_emb: bool = False):
+        if _print:    print(f"\n*** forward pass @ t={time} ***")
         if self.num_conditional_channels > 0:
             # condition = default(condition, lambda: torch.zeros_like(x))
             x = torch.cat((condition, x), dim=1)
         else:
             assert condition is None, "condition is not None but num_conditional_channels is 0"
-
+        if _print:    print(f"input x dims --> {x.shape}\n")
         orig_x_shape = x.shape[-2:]
         x = self.upsampler(x) if exists(self.upsampler) else x
         x = self.init_conv(x)
@@ -278,34 +284,58 @@ class Unet(BaseModel):
 
         t = self.time_emb_mlp(time) if exists(self.time_emb_mlp) else None
 
+        if _print:    print("\n** Encoder **")
         h = []
         for i, (block1, block2, attn, downsample) in enumerate(self.downs):
+            
+            if _print:    
+                print(f"** i={i} **")
+                print(f"input x dims: {x.shape}")
             x = block1(x, t)
             h.append(x)
-
+            if _print:     print(f"i={i} (block1) --> x dims: {x.shape}")
             x = block2(x, t)
             x = attn(x)
             h.append(x)
-
+            if _print:     print(f"i={i} (block2 + attn) --> x dims: {x.shape}")
             x = downsample(x)
+            if _print:     print(f"i={i} (downsample) --> x dims: {x.shape}")
+
+        if _print:    
+            print("\n\n** mid (latent) attention **")
+            print(f"input x: {x.shape}")
         x = self.mid_block1(x, t)
         x = self.mid_attn(x)
         x = self.mid_block2(x, t)
 
-        for block1, block2, attn, upsample in self.ups:
+        if _print:    print(f"output x: {x.shape}")
+
+
+        if _print:    print("\n\n** Decoder **")
+        for i, (block1, block2, attn, upsample) in enumerate(self.ups):
+            if _print:    
+                print(f"** i={i} **")
+                print(f"input x dims: {x.shape}")
             x = torch.cat((x, h.pop()), dim=1)
             x = block1(x, t)
+            if _print:     print(f"i={i} (block1) --> x dims: {x.shape}")
 
             x = torch.cat((x, h.pop()), dim=1)
             x = block2(x, t)
             x = attn(x)
+            if _print:    print(f"i={i} (block2 + attn) --> x dims: {x.shape}")
 
             x = upsample(x)
+            if _print:    print(f"i={i} (upsample) --> x dims: {x.shape}")
 
+        if _print:    print("\n\n** adding residual to x **")
         x = torch.cat((x, r), dim=1)
+        if _print:    print(f"x dims: {x.shape}")
 
+        if _print:    print("\n\nfinal block (res + conv) **")
         x = self.final_res_block(x, t)
         x = self.final_conv(x)
+        if _print:    print(f"x dims: {x.shape}")
         if exists(self.upsampler):
             # x = F.interpolate(x, orig_x_shape, mode='bilinear', align_corners=False)
             x = F.interpolate(x, size=orig_x_shape, mode=self.hparams.outer_sample_mode)

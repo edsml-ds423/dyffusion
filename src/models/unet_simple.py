@@ -6,7 +6,7 @@ from src.models._base_model import BaseModel
 from src.models.modules.misc import get_time_embedder
 from src.utilities.utils import exists
 
-
+_print = False
 RELU_LEAK = 0.2
 
 
@@ -99,17 +99,16 @@ class UNet(BaseModel):
             self.upsampler = nn.Identity()
         else:
             self.upsampler = torch.nn.Upsample(size=tuple(upsample_dims), mode=self.outer_sample_mode)
+        
+        
         in_channels = self.num_input_channels + self.num_conditional_channels
         # Build network operations
         if with_time_emb:
-            # time embeddings
             self.time_dim = dim * 2
             self.time_emb_mlp = get_time_embedder(self.time_dim, dim, learned_sinusoidal_cond=False)
         else:
             self.time_dim = None
             self.time_emb_mlp = None
-
-        # ENCODER LAYERS
         self.init_conv = torch.nn.Conv2d(
             in_channels=in_channels, out_channels=dim, kernel_size=1, stride=1, padding=0, bias=True
         )
@@ -126,8 +125,6 @@ class UNet(BaseModel):
                 UNetBlock(dim * 8, dim * 8, transposed=False, bn=False, relu=False, size=2, pad=0, **block_kwargs),
             ]
         )
-
-        # DECODER LAYERS
         self.output_ops = torch.nn.ModuleList(
             [
                 UNetBlock(dim * 8, dim * 8, transposed=True, bn=True, relu=True, size=2, pad=0, **block_kwargs),
@@ -163,35 +160,35 @@ class UNet(BaseModel):
 
     def _apply_ops(self, x: Tensor, time: Tensor = None):
         skip_connections = []
-        # Encoder ops
         x = self.init_conv(x)
         x = self.dropout_input(x)
-        # print("\n*** ENCODER ***")
+        if _print:    print("\n*** ENCODER ***")
         for op in self.input_ops:
-            # print(f"--> x: {x.shape}, t: {time.shape}, op(x, time) = {op(x, time).shape}")
+            if _print:    print(f"--> x: {x.shape}, t: {time.shape}, op(x, time) = {op(x, time).shape}")
             x = op(x, time)
             skip_connections.append(x)
         # Decoder ops
         x = skip_connections.pop()
-        # print("\n*** DECODER ***")
+        if _print:    print("\n*** DECODER ***")
         for op in self.output_ops:
             x = op(x, time)
             if skip_connections:
-                # print(f"--> x: {x.shape}, skip_conn: {skip_connections[-1].shape}")
+                if _print:    print(f"--> x: {x.shape}, skip_conn: {skip_connections[-1].shape}")
                 x = torch.cat([x, skip_connections.pop()], dim=1)
         
         x = self.readout(x)
-        # print(f"\n--> output (self.readout(x)): {x.shape}")
+        if _print:    print(f"\n--> output (self.readout(x)): {x.shape}")
         return x
 
     def forward(self, inputs, time=None, condition=None, return_time_emb: bool = False, **kwargs):
         # Preprocess inputs for shape
-        # print("\n\n** UNet.forward() **\n")
-        # print(f"*** inputs {inputs.shape} ***")
-        # if condition:
-        #     print(f"\ntime = {time.item()}, condition shape: {condition.shape}")
-        # else:
-        #     print(f"\ntime = {time.item()}")
+        if _print:    
+            print("\n\n** UNet.forward() **\n")
+            print(f"*** inputs {inputs.shape} ***")
+            if condition:
+                print(f"\ntime = {time.item()}, condition shape: {condition.shape}")
+            else:
+                print(f"\ntime = {time.item()}")
 
         if self.num_conditional_channels > 0:
             x = torch.cat([inputs, condition], dim=1)
@@ -199,7 +196,7 @@ class UNet(BaseModel):
             x = inputs
             assert condition is None
 
-        # print(f"*** x input dims: {x.shape} ***")
+        if _print:    print(f"*** x input dims: {x.shape} ***")
 
         t = self.time_emb_mlp(time) if exists(self.time_emb_mlp) else None
 
@@ -207,8 +204,9 @@ class UNet(BaseModel):
         orig_x_shape = x.shape[-2:]
         x = self.upsampler(x)
         y = self._apply_ops(x, t)
-        # print(f"--> y (non-interpolated) --> {y.shape}")
-        # print(f"--> y (interpolated) --> {torch.nn.functional.interpolate(y, size=orig_x_shape, mode=self.outer_sample_mode).shape}")
+        if _print:    
+            print(f"--> y (non-interpolated) --> {y.shape}")
+            print(f"--> y (interpolated) --> {torch.nn.functional.interpolate(y, size=orig_x_shape, mode=self.outer_sample_mode).shape}")
         y = torch.nn.functional.interpolate(y, size=orig_x_shape, mode=self.outer_sample_mode)
 
         # import matplotlib.pyplot as plt
