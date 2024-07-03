@@ -151,7 +151,7 @@ def reload_model_from_config_and_ckpt(
     """
     model, data_module = get_model_and_data(config) if also_datamodule else (get_lightning_module(config), None)
     # Reload model
-    # device = device or torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = device or torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model_state = torch.load(model_path, map_location=device)
     # rename weights (sometimes needed for backwards compatibility)
     state_dict = rename_state_dict_keys_and_save(model_state, model_path)
@@ -183,10 +183,10 @@ def get_checkpoint_from_path_or_wandb(
         assert model_checkpoint_path is None, "must provide either model_checkpoint or model_checkpoint_path"
         assert wandb_run_id is None, "must provide either model_checkpoint or wandb_run_id"
         model = model_checkpoint
+    # #TODO: add this in.
     # elif model_checkpoint_path is not None:
     #     raise NotImplementedError('Todo: implement loading from checkpoint path')
     #     assert wandb_run_path is None, 'must provide either model_checkpoint or wandb_run_path'
-    #
     elif wandb_run_id is not None:
         # assert model_checkpoint_path is None, 'must provide either wandb_run_path or model_checkpoint_path'
         override_key_value = ["module.verbose=False"]
