@@ -6,13 +6,22 @@
 defaults:
   - _self_
   - trainer: default.yaml                # Use trainer=ddp to run on multiple GPUs
-  - model: unet_simple_navier_stokes.yaml
+  # - model: unet_simple_navier_stokes.yaml
+  - model: unet_resnet.yaml
   - diffusion: null
-  - datamodule: physical_systems.yaml    #  Physical systems benchmark datasets
-  - module: forecasting_multi_horizon_at_once.yaml   # simple multi-step forecasting module by default
+  # - diffusion: dyffusion.yaml
+  # - datamodule: physical_systems.yaml    #  Physical systems benchmark datasets
+  # - datamodule: oisst.yaml
+  - datamodule: imerg_precipitation.yaml
 
-  - callbacks: wandb.yaml  # or use default.yaml
-  - logger: wandb.yaml     # set logger here or use command line (e.g. `python train.py logger=wandb`)
+  - module: interpolation.yaml  
+  # - module: forecasting_multi_horizon_at_once.yaml   # simple multi-step forecasting module by default
+  # - module: forecasting_multi_horizon_dyffusion.yaml
+  # - module: forecasting_multi_horizon_time_conditioned
+
+  # - callbacks: wandb.yaml  # or use default.yaml
+  - callbacks: default.yaml
+  - logger: none.yaml # wandb.yaml     # set logger here or use command line (e.g. `python train.py logger=wandb`)
 
   # modes are special collections of config options for different purposes, e.g. debugging
   - mode: default.yaml
