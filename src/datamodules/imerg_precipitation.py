@@ -48,6 +48,12 @@ class IMERGPrecipitationDataModule(BaseDataModule):
 
         super().__init__(data_dir=data_dir, **kwargs)
         self.save_hyperparameters()
+        
+        self.normalization_hparams = {
+            "norm": True,
+            "percentiles": {"1": 0.0,
+                            "99": 4.569999694824219},
+            }
 
         # Set the temporal slices for the train, val, and test sets. lims (not inclusive).
         self.train_lims = [None, "2023-01-01 00:00:00"]  # jan-20 - may-23
@@ -71,7 +77,7 @@ class IMERGPrecipitationDataModule(BaseDataModule):
             "predict": self.test_slice,
             None: None,
         }
-
+    
     @staticmethod
     def convert_str_to_datetime(str_dt: str, dt_format: str = "%Y-%m-%d %H:%M:%S"):
         return datetime.datetime.strptime(str_dt, dt_format)
@@ -210,11 +216,12 @@ class IMERGPrecipitationDataModule(BaseDataModule):
     def create_and_set_dataset(self, split: str, dataset: xr.DataArray) -> Dict[str, np.ndarray]:
         """Create a torch dataset from the given xarray DataArray and return it."""
         window, horizon = self.hparams.window, self.get_horizon(split)
-        X = dataset.to_numpy()  # dims: (N, S, H, W)
-        X = X[:100]
-        X = np.expand_dims(X, 2)  # dims: (N, S, C, H, W)
-        # assert X.shape == (dataset.shape[0], window + horizon, 1, self.hparams["box_size"], self.hparams["box_size"])
 
+        #TODO: try and speed this up.
+        X = dataset.to_numpy()  # dims: (N, S, H, W)
+        X = np.expand_dims(X, 2)  # dims: (N, S, C, H, W)
+
+        assert X.shape == (dataset.shape[0], window + horizon, 1, self.hparams["box_size"], self.hparams["box_size"])
         return {"dynamics": X}
 
     def setup(self, stage: Optional[str] = None):
@@ -227,7 +234,7 @@ class IMERGPrecipitationDataModule(BaseDataModule):
         ds_predict = (
             self.get_ds_xarray_or_numpy("predict", self.stage_to_slice["predict"]) if stage == "predict" else None
         )
-        ds_splits = {"train": ds_train, "val": ds_val, "test": ds_test, "predict": ds_predict}
+        ds_splits = {"train": ds_train, "val": ds_val, "test": ds_test, "predict": ds_predict}        
         for split, split_ds in ds_splits.items():
             if split_ds is None:
                 continue
@@ -243,7 +250,8 @@ class IMERGPrecipitationDataModule(BaseDataModule):
                 numpy_tensors = split_ds
 
             # Create the pytorch tensor dataset
-            tensor_ds = MyTensorDataset(numpy_tensors, dataset_id=split)
+            tensor_ds = MyTensorDataset(numpy_tensors, dataset_id=split, **self.normalization_hparams)
+
             # Save the tensor dataset to self._data_{split}
             setattr(self, f"_data_{split}", tensor_ds)
             assert getattr(self, f"_data_{split}") is not None, f"Could not create {split} dataset"
