@@ -455,17 +455,18 @@ class DYffusion(BaseDYffusion):
         super().__init__(*args, **kwargs)
         self.save_hyperparameters(ignore=["interpolator", "model"])
         self.interpolator: InterpolationExperiment = get_checkpoint_from_path_or_wandb(
-            interpolator,
-            interpolator_local_checkpoint_path,
-            interpolator_run_id,
+            model_checkpoint=interpolator,                                # dyffusion.yaml.interpolator
+            model_checkpoint_path=interpolator_local_checkpoint_path,     # dyffusion.yaml.interpolator_local_checkpoint_path
+            wandb_run_id=interpolator_run_id,                             # dyffusion.yaml.interpolator_run_id
             wandb_kwargs=dict(epoch="best", ckpt_filename=interpolator_wandb_ckpt_filename),
         )
+
         # freeze the interpolator (and set to eval mode)
         freeze_model(self.interpolator)
 
         self.interpolator_window = self.interpolator.window
         self.interpolator_horizon = self.interpolator.true_horizon
-        last_d_to_i_tstep = self.diffusion_step_to_interpolation_step(self.num_timesteps - 1)
+        last_d_to_i_tstep = self.diffusion_step_to_interpolation_step(diffusion_step=(self.num_timesteps - 1))
         if self.interpolator_horizon != last_d_to_i_tstep + 1:
             # maybe: automatically set the num_timesteps to the interpolator_horizon
             raise ValueError(
