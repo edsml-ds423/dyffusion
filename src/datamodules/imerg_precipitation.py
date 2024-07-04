@@ -148,9 +148,11 @@ class IMERGPrecipitationDataModule(BaseDataModule):
         ddir = Path(self.hparams.data_dir)
         if isinstance(boxes, Sequence) and boxes != "all":
             self.n_boxes = len(boxes)
+            log.info(f"training & validation using {self.n_boxes} (i, j) boxes: {boxes}.")
             return [ddir / f"imerg.box.{b.split(',')[0]}.{b.split(',')[1]}.sequenced.nc" for b in boxes]
         elif boxes == "all":
             # compute the number of boxes
+            log.info(f"training & validation using 'all' (i, j) boxes: {boxes}.")
             self.n_boxes = len(list(ddir.glob("imerg.box.*.*.sequenced.nc")))
             return str(ddir / "imerg.box.*.*.sequenced.nc")
         else:
