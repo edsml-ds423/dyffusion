@@ -13,6 +13,10 @@ from src.experiment_types.interpolation import InterpolationExperiment
 from src.interface import get_checkpoint_from_path_or_wandb
 from src.utilities.utils import freeze_model, raise_error_if_invalid_value
 
+#TODO: remove this.
+# temp _print flag (for debugging).
+_print = False
+
 
 class BaseDYffusion(BaseDiffusion):
     def __init__(
@@ -107,6 +111,7 @@ class BaseDYffusion(BaseDiffusion):
         """
         # assert correct range
         if torch.is_tensor(diffusion_step):
+            # checks that the diffusion step is not the target.
             assert (0 <= diffusion_step).all() and (
                 diffusion_step <= self.num_timesteps - 1
             ).all(), f"diffusion_step must be in [1, num_timesteps-1]=[{1}, {self.num_timesteps - 1}], but got {diffusion_step}"
@@ -149,11 +154,11 @@ class BaseDYffusion(BaseDiffusion):
         # just remember that x_end here refers to t=0 (the initial conditions)
         # and x_0 (terminology of diffusion models) refers to t=T, i.e. the last timestep
         assert t is None or interpolation_time is None, "Either t or interpolation_time must be None."
-        t = interpolation_time if t is None else self.diffusion_step_to_interpolation_step(t)  # .float()
+        t = interpolation_time if t is None else self.diffusion_step_to_interpolation_step(t)  # .float()        
         do_enable = self.training or self.enable_interpolator_dropout
-
         ipol_handles = [self.interpolator] if hasattr(self, "interpolator") else [self]
         with ExitStack() as stack:
+            if _print:    print(f"--> interpolating at {t.cpu().detach()} with x_end: {x_end.shape} and x0: {x0.shape}")
             # inference_dropout_scope of all handles (enable and disable) is managed by the ExitStack
             for ipol in ipol_handles:
                 stack.enter_context(ipol.inference_dropout_scope(condition=do_enable))
@@ -455,10 +460,10 @@ class DYffusion(BaseDYffusion):
         super().__init__(*args, **kwargs)
         self.save_hyperparameters(ignore=["interpolator", "model"])
         self.interpolator: InterpolationExperiment = get_checkpoint_from_path_or_wandb(
-            model_checkpoint=interpolator,                                # dyffusion.yaml.interpolator
-            model_checkpoint_path=interpolator_local_checkpoint_path,     # dyffusion.yaml.interpolator_local_checkpoint_path
-            wandb_run_id=interpolator_run_id,                             # dyffusion.yaml.interpolator_run_id
-            wandb_kwargs=dict(epoch="best", ckpt_filename=interpolator_wandb_ckpt_filename),
+            model_checkpoint=interpolator,                                # configs/diffusion/dyffusion.yaml.interpolator
+            model_checkpoint_path=interpolator_local_checkpoint_path,     # configs/diffusion/dyffusion.yaml.interpolator_local_checkpoint_path
+            wandb_run_id=interpolator_run_id,                             # configs/diffusion/dyffusion.yaml.interpolator_run_id
+            wandb_kwargs=dict(epoch="best", ckpt_filename=interpolator_wandb_ckpt_filename),  # configs/diffusion/dyffusion.yaml.interpolator_wandb_ckpt_filename
         )
 
         # freeze the interpolator (and set to eval mode)
@@ -493,6 +498,8 @@ class DYffusion(BaseDYffusion):
     def p_losses(self, xt_last: Tensor, condition: Tensor, t: Tensor, static_condition: Tensor = None):
         r"""
 
+        the input is [batch, c, h, w]?
+
         Args:
             xt_last: the start/target data  (time = horizon)
             condition: the initial condition data  (time = 0)
@@ -509,6 +516,12 @@ class DYffusion(BaseDYffusion):
         #   1. For t=0, simply use the initial conditions
         x_t = condition.clone()
 
+        if _print:
+            print("\n** DYffusion.p_losses(xt_last, condition (x0), t, static_condition) **")
+            print(f"--> xt_last dims: {xt_last.shape} | condition (x0) dims: {condition.shape}")
+            print(f"--> timestep of the diffusion process, t={t.detach().cpu()}")
+            print(f"--> interpolating t={t.detach().cpu()} for each batch.")
+
         #   2. For t>0, we need to interpolate the data using the interpolator
         t_nonzero = t > 0
         if t_nonzero.any():
@@ -519,13 +532,17 @@ class DYffusion(BaseDYffusion):
                 static_condition=None if static_condition is None else static_condition[t_nonzero],
                 num_predictions=1,  # sample one interpolation prediction
             )
-            # Now, simply concatenate the inital_conditions for t=0 with the interpolated data for t>0
+            # add the interpolated samples to x_t 
+            # x0 and x_t will be used to forecast x_t+h
             x_t[t_nonzero] = x_interpolated.to(x_t.dtype)
         # assert torch.all(x_t[t == 0] == condition[t == 0])
 
         # Train the forward predictions (i.e. predict xt_last from xt_t)
         xt_last_target = xt_last
-        xt_last_pred = self.predict_x_last(condition=condition, x_t=x_t, t=t, static_condition=static_condition)
+        xt_last_pred = self.predict_x_last(condition=condition,
+                                           x_t=x_t,
+                                           t=t,
+                                           static_condition=static_condition)
         loss_forward = self.criterion(xt_last_pred, xt_last_target)
 
         # Train the forward predictions II by emulating one more step of the diffusion process
@@ -533,6 +550,9 @@ class DYffusion(BaseDYffusion):
         t2 = t[tnot_last] + 1  # t2 is the next time step, between 1 and T-1
         calc_t2 = tnot_last.any()
         if lam2 > 0 and calc_t2:
+            if _print:
+                print("--> adding one-step look ahead loss term due to n+1<N where n=t and N=h")
+                print(f"--> t={t[tnot_last]} ({tnot_last}), h={self.interpolator.horizon}")
             # train the predictions using x0 = xlast = forward_pred(condition, t=0)
             cond_notlast = condition[tnot_last]
             x0not_last = xt_last_pred[tnot_last]
@@ -561,4 +581,21 @@ class DYffusion(BaseDYffusion):
             f"{log_prefix}/loss_forward": loss_forward,
             f"{log_prefix}/loss_forward2": loss_forward2,
         }
+
+        if _print:
+            # print x0, x_t (interpolated), x_t+h (prediction) and x_t+h (target).
+            import matplotlib.pyplot as plt
+            _batch, _channel = 1, 0
+            _t = t.detach().cpu()[_batch].item()
+            fig, ax = plt.subplots(1, 4, figsize=(12, 5))
+            ax[0].imshow(condition[_batch, _channel, :, :])  # x0
+            ax[0].set_title("x0 (init condition)", fontsize=8)
+            ax[1].imshow(x_t.detach().cpu()[_batch, _channel, :, :])
+            ax[1].set_title(f"x_t (interpolated at {_t})", fontsize=8)
+            ax[2].imshow(xt_last_pred.detach().cpu()[_batch, _channel, :, :])
+            ax[2].set_title(f"xt_last_pred (x0+h)", fontsize=8)
+            ax[3].imshow(xt_last_target.detach().cpu()[_batch, _channel, :, :])
+            ax[3].set_title(f"xt_last_target (x0+h)", fontsize=8)
+            plt.savefig("DYffusion_forecast_example")
+
         return loss_dict

@@ -9,6 +9,9 @@ from torch import Tensor
 
 from src.models._base_model import BaseModel
 
+#TODO: remove this.
+# temp _print flag (for debugging).
+_print = False
 
 class BaseDiffusion(BaseModel):
     def __init__(
@@ -93,6 +96,16 @@ class BaseDiffusion(BaseModel):
 
         p_losses_args = inspect.signature(self.p_losses).parameters.keys()
         kwargs = {}
+
+        if _print:
+            print("\n** BaseDiffusion.forward(self, inputs, targets, condition, time) **")
+            print(f"--> batch size = {b}")
+            print(f"--> t = {t}")
+            for _batch in range(b):
+                print(f"--> for batch={_batch}: interpolating t = {t[_batch].item()}")
+            print(f"--> input dims: {inputs.shape}")
+            print(f"--> target dims: {targets.shape}")
+
         if "static_condition" in p_losses_args:
             # method handles it internally
             kwargs["static_condition"] = condition
@@ -102,6 +115,9 @@ class BaseDiffusion(BaseModel):
         else:
             channel_dim = 1
             kwargs["condition"] = torch.cat([inputs, condition], dim=channel_dim)
+
+        assert condition is None
+        assert torch.allclose(kwargs["condition"], inputs)
 
         return self.p_losses(targets, t=t, **kwargs)
 
