@@ -8,6 +8,9 @@ import numpy as np
 import torch
 from torch import Tensor
 from torch.utils.data import Dataset
+from src.utilities.utils import get_logger
+
+log = get_logger(__name__)
 
 
 class MyTensorDataset(Dataset[Dict[str, Tensor]]):
@@ -74,6 +77,7 @@ class MyTensorDataset(Dataset[Dict[str, Tensor]]):
         with ThreadPoolExecutor() as executor:
             # create a {key: tensor} from {key: numpy} dict.
             tensors = dict(executor.map(self.convert_to_tensor, tensors.items()))
+        log.info("created tensor dataset.")
 
         any_tensor = next(iter(tensors.values()))
         self.dataset_size = any_tensor.size(0)
@@ -85,9 +89,13 @@ class MyTensorDataset(Dataset[Dict[str, Tensor]]):
         if self.normalize:
             if self.train_percentiles is None:
                 raise ValueError("Percentiles must be provided in kwargs when normalize is True.")
+            log.info("normalizing data using 1st and 99th training data percentiles.")
+            log.info(f"1st: {self.train_percentiles['1']}, 99th: {self.train_percentiles['99']}")
             self._normalize_tensors()
-    
+            log.info("normalised dataset.")
+
     #TODO: this comsumes a lot of memory. Maybe have to chunk it.
+    #TODO: simple for loop with chunks seems to be a bit quicker.
     def _normalize_tensors(self):
         for key, tensor in self.tensors.items():
             self.tensors[key] = self.log_linear_norm(
