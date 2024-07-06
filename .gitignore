@@ -1,5 +1,5 @@
 # Project specific
-
+*.png
 results/
 data/
 *.ckpt
@@ -12,6 +12,10 @@ data/
 
 .ipynb_checkpoints
 */.ipynb_checkpoints/*
+
+# specific removals.
+misc_images
+.vscode
 
 # IPython
 profile_default/
