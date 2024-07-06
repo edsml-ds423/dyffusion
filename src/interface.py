@@ -179,6 +179,12 @@ def get_checkpoint_from_path_or_wandb(
     model_name: Optional[str] = "model",
     wandb_kwargs: Optional[Dict[str, Any]] = None,
 ) -> torch.nn.Module:
+    
+    log.info("getting model checkpoint w/ params:")
+    log.info(f"model_checkpoint = {model_checkpoint}")
+    log.info(f"model_checkpoint_path = {model_checkpoint_path}")
+    log.info(f"wandb_run_id = {wandb_run_id}")
+
     if model_checkpoint is not None:
         assert model_checkpoint_path is None, "must provide either model_checkpoint or model_checkpoint_path"
         assert wandb_run_id is None, "must provide either model_checkpoint or wandb_run_id"
@@ -188,6 +194,7 @@ def get_checkpoint_from_path_or_wandb(
     #     raise NotImplementedError('Todo: implement loading from checkpoint path')
     #     assert wandb_run_path is None, 'must provide either model_checkpoint or wandb_run_path'
     elif wandb_run_id is not None:
+        # load from wandb.
         # assert model_checkpoint_path is None, 'must provide either wandb_run_path or model_checkpoint_path'
         override_key_value = ["module.verbose=False"]
         wandb_kwargs = wandb_kwargs or {}
@@ -198,6 +205,10 @@ def get_checkpoint_from_path_or_wandb(
             local_checkpoint_path=model_checkpoint_path,
             **wandb_kwargs,
         )["model"]
+    elif model_checkpoint_path is not None:
+        # load from local file.
+        raise NotImplementedError("Loading direct from local path is not yet handled.")
+        # reloaded_model_data = reload_model_from_config_and_ckpt(config, ckpt_path, **reload_kwargs)
     else:
         raise ValueError("Provide either model_checkpoint, model_checkpoint_path or wandb_run_id")
     return model
