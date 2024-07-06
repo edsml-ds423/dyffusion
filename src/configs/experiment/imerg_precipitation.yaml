@@ -10,11 +10,11 @@ name: "ImergPrecipitationNowcast"
 # optional.
 # overwritten by datamodule configs: _base_data_config.yaml & imerg_precipitation.yaml
 datamodule:
-  batch_size: null # 1          # overwritten by datamodule/_base_data_config.yaml
-  eval_batch_size: null # 1     # overwritten by datamodule/_base_data_config.yaml. Effectively eval_batch_size *= number of predictions ($module.num_predictions; default=20)
-  horizon: null # 8             # overwritten by datamodule/_base_data_config.yaml
-  prediction_horizon: null # 8
-  boxes: null # ["1,0", "1,1"]
+  batch_size: 12 # null # 1          # overwritten by datamodule/_base_data_config.yaml
+  eval_batch_size: 12  # null # 1     # overwritten by datamodule/_base_data_config.yaml. Effectively eval_batch_size *= number of predictions ($module.num_predictions; default=20)
+  horizon: 8  # null # 8             # overwritten by datamodule/_base_data_config.yaml
+  prediction_horizon: 8 # null # 8
+  boxes: ["1,0"] # null # ["1,0", "1,1"]
 
 model:
   block_dropout: 0.3
