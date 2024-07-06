@@ -69,6 +69,8 @@ def run_model(config: DictConfig) -> float:
         ckpt_path = None
 
     # Obtain the instantiated model and data classes from the config
+    # need the below line to go from Lightening AI to local root.
+    # config["datamodule"]["data_dir"] = "/Users/ds423/git_uni/dyffusion/data/imerg-precipitation"
     model, datamodule = get_model_and_data(config)
 
     # Init Lightning callbacks and loggers (e.g. model checkpointing and Wandb logger)
