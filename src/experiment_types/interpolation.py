@@ -153,8 +153,8 @@ class InterpolationExperiment(BaseExperiment):
         inputs = self.get_inputs_from_dynamics(dynamics, split=split)  # (b, c, h, w) at time 0
         b = dynamics.shape[0]
 
+        # take random choice of possible time
         possible_times = torch.tensor(self.horizon_range, device=self.device, dtype=torch.long)  # (h,)
-        # take random choice of time
         t = possible_times[torch.randint(len(possible_times), (b,), device=self.device, dtype=torch.long)]  # (b,)
         # t = torch.randint(start_t, max_t, (b,), device=self.device, dtype=torch.long)  # (b,)
         targets = dynamics[torch.arange(b), self.window + t - 1, ...]  # (b, c, h, w)
