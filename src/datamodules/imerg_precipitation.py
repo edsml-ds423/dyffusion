@@ -23,10 +23,10 @@ class IMERGPrecipitationDataModule(BaseDataModule):
         self,
         data_dir: str,
         boxes: Union[List, str] = "all",
-        # validation_boxes: Union[List, str] = "all",  # splitting data based on t not boxes.
-        # predict_boxes: Union[List, str] = "all",     # ^^
+        # TODO add in predict slice for visual case study - cyclone yuka?
         # predict_slice: Optional[slice] = slice("2020-12-01", "2020-12-31"),  #TODO: is this just  = test?
         box_size: int = 256,
+        sequence_dt: int = 1,
         window: int = 1,
         horizon: int = 1,
         prediction_horizon: int = None,  # None means use horizon
@@ -38,7 +38,7 @@ class IMERGPrecipitationDataModule(BaseDataModule):
         """initialisation."""
         raise_error_if_invalid_type(data_dir, possible_types=[str], name="data_dir")
         raise_error_if_invalid_value(pixelwise_normalization, [True], name="pixelwise_normalization")
-        raise_error_if_invalid_value(box_size, [256], name="box_size")
+        raise_error_if_invalid_value(box_size, [128], name="box_size")
 
         if "imerg-precipitation" not in data_dir:
             for name in ["imerg-precipitation"]:
@@ -48,17 +48,22 @@ class IMERGPrecipitationDataModule(BaseDataModule):
 
         super().__init__(data_dir=data_dir, **kwargs)
         self.save_hyperparameters()
-        
+
+        #TODO: think of a better way of handling this.
         self.normalization_hparams = {
             "norm": True,
-            "percentiles": {"1": 0.0,
-                            "99": 4.569999694824219},
-            }
+            "percentiles": {"1": 0.0, "99": 5.690000057220459},
+        }
 
         # Set the temporal slices for the train, val, and test sets. lims (not inclusive).
         self.train_lims = [None, "2023-01-01 00:00:00"]  # jan-20 - may-23
         self.val_lims = ["2023-01-01 00:00:00", "2023-07-01 00:00:00"]  # may-23 - sep-23
         self.test_lims = ["2023-07-01 00:00:00", "2024-01-01 00:00:00"]  # sep-23 - jan-24
+
+        # #  time slices (for debugging).
+        # self.train_lims = [None, "2021-01-01 00:00:00"]  # jan-20 - may-23
+        # self.val_lims = ["2021-01-01 00:00:00", "2021-07-01 00:00:00"]  # may-23 - sep-23
+        # self.test_lims = ["2021-07-01 00:00:00", "2022-01-01 00:00:00"]  # sep-23 - jan-24
 
         # convert lims to index key (specific to IMERG).
         self.train_index = [self.convert_str_dt_to_imerg_int_dt(t) for t in self.train_lims]
@@ -77,9 +82,10 @@ class IMERGPrecipitationDataModule(BaseDataModule):
             "predict": self.test_slice,
             None: None,
         }
-    
+
     @staticmethod
     def convert_str_to_datetime(str_dt: str, dt_format: str = "%Y-%m-%d %H:%M:%S"):
+        """"""
         return datetime.datetime.strptime(str_dt, dt_format)
 
     @staticmethod
@@ -87,15 +93,23 @@ class IMERGPrecipitationDataModule(BaseDataModule):
         """"""
         if str_dt is not None:
             datetime_dt = IMERGPrecipitationDataModule.convert_str_to_datetime(str_dt)
-            y, m, d, hh, mm = IMERGPrecipitationDataModule.get_year_month_day_hour_min_from_datetime(
-                datetime_dt, zero_padding=2
+            y, m, d, hh, mm = (
+                IMERGPrecipitationDataModule.get_year_month_day_hour_min_from_datetime(
+                    datetime_dt, zero_padding=2
+                )
             )
-            hhmm_in_dt_s = IMERGEarlyRunDataConfig().download_file_path_info["hhmm_to_dt_secs"].get(f"{hh}{mm}")
+            hhmm_in_dt_s = (
+                IMERGEarlyRunDataConfig()
+                .download_file_path_info["hhmm_to_dt_secs"]
+                .get(f"{hh}{mm}")
+            )
             str_dt = int(f"{y}{m}{d}{hhmm_in_dt_s}")
         return str_dt
 
     @staticmethod
-    def get_year_month_day_hour_min_from_datetime(dt: datetime.datetime, zero_padding: int):
+    def get_year_month_day_hour_min_from_datetime(
+        dt: datetime.datetime, zero_padding: int
+    ):
         """"""
         _year = str(dt.year)
         _month = str(dt.month).zfill(zero_padding)
@@ -117,14 +131,12 @@ class IMERGPrecipitationDataModule(BaseDataModule):
         boxes = self.hparams.boxes
         h = self.hparams.horizon
         w = self.hparams.window
-        assert isinstance(h, list) or h > 0, f"horizon must be > 0 or a list, but is {h}"
+        assert (isinstance(h, list) or h > 0), f"horizon must be > 0 or a list, but is {h}"
         assert w > 0, f"window must be > 0, but is {w}"
-        assert self.hparams.box_size > 0, f"box_size must be > 0, but is {self.hparams.box_size}"
-        assert isinstance(boxes, Sequence) or boxes in [
-            "all"
-        ], f"boxes must be a list or 'all', but is {self.hparams.boxes}"
+        assert (self.hparams.box_size > 0), f"box_size must be > 0, but is {self.hparams.box_size}"
+        assert isinstance(boxes, Sequence) or boxes in ["all"], f"boxes must be a list or 'all', but is {self.hparams.boxes}"
 
-    # TODO: move to GriddedDataBaseModel(BaseDataModule).
+    # TODO: Create a GriddedDataBaseModel(BaseDataModule) and move this there.
     def load_xarray_ds(self, stage: str) -> bool:
         b1 = not self.hparams.save_and_load_as_numpy
         return b1 or self._get_numpy_filename(stage) is None or stage == "predict"
@@ -145,16 +157,17 @@ class IMERGPrecipitationDataModule(BaseDataModule):
 
     def get_glob_pattern(self, boxes: Union[List, str] = "all"):
         """"""
+        imerg_file_scaffolding = f"imerg.box.*.*.{self.hparams['box_size']}.dt{self.hparams['sequence_dt']}.sequenced.nc"
         ddir = Path(self.hparams.data_dir)
         if isinstance(boxes, Sequence) and boxes != "all":
             self.n_boxes = len(boxes)
             log.info(f"training & validation using {self.n_boxes} (i, j) boxes: {boxes}.")
-            return [ddir / f"imerg.box.{b.split(',')[0]}.{b.split(',')[1]}.sequenced.nc" for b in boxes]
+            return [ddir/ f"imerg.box.{b.split(',')[0]}.{b.split(',')[1]}.{self.hparams['box_size']}.dt{self.hparams['sequence_dt']}.sequenced.nc" for b in boxes]
         elif boxes == "all":
-            # compute the number of boxes
             log.info(f"training & validation using 'all' (i, j) boxes: {boxes}.")
-            self.n_boxes = len(list(ddir.glob("imerg.box.*.*.sequenced.nc")))
-            return str(ddir / "imerg.box.*.*.sequenced.nc")
+            # deduce the number of boxes.
+            self.n_boxes = len(list(ddir.glob(imerg_file_scaffolding)))
+            return str(ddir / imerg_file_scaffolding)
         else:
             raise ValueError(f"Unknown value for boxes: {boxes}")
 
@@ -170,23 +183,26 @@ class IMERGPrecipitationDataModule(BaseDataModule):
             return fname + ".npz"
         return None
 
-    def get_ds_xarray_or_numpy(self, split: str, time_slice) -> Union[xr.DataArray, Dict[str, np.ndarray]]:
+    def get_ds_xarray_or_numpy(
+        self, split: str, time_slice
+    ) -> Union[xr.DataArray, Dict[str, np.ndarray]]:
         """"""
         if self.load_xarray_ds(split):
             glob_pattern = self.get_glob_pattern(self.hparams.boxes)
-            log.info(f"Using data from {self.n_boxes} boxes for ``{split}`` split.")
             log.info(f"{split} data split: [{time_slice.start}, {time_slice.stop}]")
             with dask.config.set(**{"array.slicing.split_large_chunks": False}):
                 try:
                     data = xr.open_mfdataset(
                         paths=glob_pattern,
                         combine="nested",
-                        concat_dim="t_index",
+                        concat_dim="time",
                     )
-                    # TODO: maybe create .nc with t_index being an int to avoid this conversion.
-                    # TODO: change t_index to <time>.
-                    data.coords["t_index"] = data.coords["t_index"].astype(int)  # convert to int to allow < > ops.
-                    mask = self._create_time_index_mask(index_to_slice=data.t_index, _slice=time_slice)
+                    data.coords["time"] = data.coords["time"].astype(
+                        int
+                    )  # convert to int to allow < > ops.
+                    mask = self._create_time_index_mask(
+                        index_to_slice=data.time, _slice=time_slice
+                    )
                     masked_data = data.where(mask, drop=True)
 
                 except OSError as e:
@@ -215,28 +231,52 @@ class IMERGPrecipitationDataModule(BaseDataModule):
             return self.create_and_set_dataset(*args, **kwargs)
             # return self.create_and_set_dataset_single_horizon(*args, **kwargs)
 
-    def create_and_set_dataset(self, split: str, dataset: xr.DataArray) -> Dict[str, np.ndarray]:
+    def create_and_set_dataset(
+        self, split: str, dataset: xr.DataArray
+    ) -> Dict[str, np.ndarray]:
         """Create a torch dataset from the given xarray DataArray and return it."""
         window, horizon = self.hparams.window, self.get_horizon(split)
-
-        #TODO: try and speed this up.
+        # TODO: try and speed this up.
         X = dataset.to_numpy()  # dims: (N, S, H, W)
+        #TODO: this will need to be removed when adding in era5 data. 
         X = np.expand_dims(X, 2)  # dims: (N, S, C, H, W)
-
-        assert X.shape == (dataset.shape[0], window + horizon, 1, self.hparams["box_size"], self.hparams["box_size"])
+        assert X.shape == (
+            dataset.shape[0],
+            window + horizon,
+            1,
+            self.hparams["box_size"],
+            self.hparams["box_size"],
+        )
         return {"dynamics": X}
 
     def setup(self, stage: Optional[str] = None):
         """Load data. Set internal variables: self._data_train, self._data_val, self._data_test."""
-        ds_train = self.get_ds_xarray_or_numpy("fit", self.train_slice) if stage in ["fit", None] else None
+        ds_train = (
+            self.get_ds_xarray_or_numpy("fit", self.train_slice)
+            if stage in ["fit", None]
+            else None
+        )
         ds_val = (
-            self.get_ds_xarray_or_numpy("validate", self.val_slice) if stage in ["fit", "validate", None] else None
+            self.get_ds_xarray_or_numpy("validate", self.val_slice)
+            if stage in ["fit", "validate", None]
+            else None
         )
-        ds_test = self.get_ds_xarray_or_numpy("test", self.test_slice) if stage in ["test", None] else None
+        ds_test = (
+            self.get_ds_xarray_or_numpy("test", self.test_slice)
+            if stage in ["test", None]
+            else None
+        )
         ds_predict = (
-            self.get_ds_xarray_or_numpy("predict", self.stage_to_slice["predict"]) if stage == "predict" else None
+            self.get_ds_xarray_or_numpy("predict", self.stage_to_slice["predict"])
+            if stage == "predict"
+            else None
         )
-        ds_splits = {"train": ds_train, "val": ds_val, "test": ds_test, "predict": ds_predict}        
+        ds_splits = {
+            "train": ds_train,
+            "val": ds_val,
+            "test": ds_test,
+            "predict": ds_predict,
+        }
         for split, split_ds in ds_splits.items():
             if split_ds is None:
                 continue
@@ -251,12 +291,14 @@ class IMERGPrecipitationDataModule(BaseDataModule):
                 # Alternatively, load the numpy arrays from disk (if requested).
                 numpy_tensors = split_ds
 
-            # Create the pytorch tensor dataset
-            tensor_ds = MyTensorDataset(numpy_tensors, dataset_id=split, **self.normalization_hparams)
-
-            # Save the tensor dataset to self._data_{split}
+            tensor_ds = MyTensorDataset(
+                numpy_tensors, dataset_id=split, **self.normalization_hparams
+            )
+            # save the tensor dataset to self._data_{split}
             setattr(self, f"_data_{split}", tensor_ds)
-            assert getattr(self, f"_data_{split}") is not None, f"Could not create {split} dataset"
+            assert (
+                getattr(self, f"_data_{split}") is not None
+            ), f"Could not create {split} dataset"
 
         # print sizes of the datasets (how many examples).
         self.print_data_sizes(stage)
