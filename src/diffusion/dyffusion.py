@@ -11,7 +11,10 @@ from tqdm.auto import tqdm
 from src.diffusion._base_diffusion import BaseDiffusion
 from src.experiment_types.interpolation import InterpolationExperiment
 from src.interface import get_checkpoint_from_path_or_wandb
-from src.utilities.utils import freeze_model, raise_error_if_invalid_value
+from src.utilities.utils import freeze_model, raise_error_if_invalid_value, get_logger
+
+log = get_logger(__name__)
+
 
 #TODO: remove this.
 # temp _print flag (for debugging).
@@ -357,6 +360,8 @@ class BaseDYffusion(BaseDiffusion):
             self.sampling_schedule[1:] + [last_i_n_plus_one],
             self.sampling_schedule[2:] + [last_i_n_plus_one, last_i_n_plus_one],
         )
+        # store the x0_hat to see if they "improve"...
+        x0_hats = []
         for s, s_next, s_nnext in tqdm(
             s_and_snext, desc="Sampling time step", total=len(self.sampling_schedule), leave=False
         ):
@@ -364,6 +369,8 @@ class BaseDYffusion(BaseDiffusion):
             # F(x_s, s) = predict target data
             step_s = torch.full((batch_size,), s, dtype=torch.float32, device=self.device)
             x0_hat = self.predict_x_last(condition=initial_condition, x_t=x_s, t=step_s, is_sampling=True, **sc_kw)
+
+            x0_hats.append(x0_hat)
 
             # Are we predicting dynamical time step or an artificial interpolation step?
             time_i_n = self.diffusion_step_to_interpolation_step(s_next) if not is_last_step else np.inf
@@ -422,6 +429,32 @@ class BaseDYffusion(BaseDiffusion):
                     **q_sample_kwargs, t=None, interpolation_time=i_n_time_tensor, **sc_kw
                 )
 
+        # # debug print. 
+        # import matplotlib.pyplot as plt
+        # fig, axs = plt.subplots(8, 5, figsize=(22, 18))
+        # _b = 1
+        # c = 0
+        # plt.rc('xtick', labelsize=4) 
+        # plt.rc('ytick', labelsize=4) 
+        # for e, i in enumerate(range(0+_b, 9+_b, 2)):
+        #     axs[0, e].imshow(x0_hats[0][i, c, :, :])
+        #     axs[0, e].set_title("preds_0", fontsize=8)
+        #     axs[1, e].imshow(x0_hats[1][i, c, :, :])
+        #     axs[1, e].set_title("preds_1", fontsize=8)
+        #     axs[2, e].imshow(x0_hats[2][i, c, :, :])
+        #     axs[2, e].set_title("preds_2", fontsize=8)
+        #     axs[3, e].imshow(x0_hats[3][i, c, :, :])
+        #     axs[3, e].set_title("preds_3", fontsize=8)
+        #     axs[4, e].imshow(x0_hats[4][i, c, :, :])
+        #     axs[4, e].set_title("preds_4", fontsize=8)
+        #     axs[5, e].imshow(x0_hats[5][i, c, :, :])
+        #     axs[5, e].set_title("preds_5", fontsize=8)
+        #     axs[6, e].imshow(x0_hats[6][i, c, :, :])
+        #     axs[6, e].set_title("preds_6", fontsize=8)
+        #     axs[7, e].imshow(x0_hats[7][i, c, :, :])
+        #     axs[7, e].set_title("preds_7", fontsize=8)
+        # plt.savefig(f"iter_preds_b{_b}")
+
         if last_i_n_plus_one < self.num_timesteps:
             return x_s, intermediates, x_interpolated_s_next
         return x0_hat, intermediates, x_s
@@ -462,10 +495,13 @@ class DYffusion(BaseDYffusion):
         self.interpolator: InterpolationExperiment = get_checkpoint_from_path_or_wandb(
             model_checkpoint=interpolator,                                # configs/diffusion/dyffusion.yaml.interpolator
             model_checkpoint_path=interpolator_local_checkpoint_path,     # configs/diffusion/dyffusion.yaml.interpolator_local_checkpoint_path
-            wandb_run_id=interpolator_run_id,                             # configs/diffusion/dyffusion.yaml.interpolator_run_id
-            wandb_kwargs=dict(epoch="best", ckpt_filename=interpolator_wandb_ckpt_filename),  # configs/diffusion/dyffusion.yaml.interpolator_wandb_ckpt_filename
+            wandb_run_id=interpolator_run_id,                            # configs/diffusion/dyffusion.yaml.interpolator_run_id
+            #TODO: look into the best arg. 
+            wandb_kwargs=dict(epoch="last", # "best", 
+                              ckpt_filename=interpolator_wandb_ckpt_filename),  # configs/diffusion/dyffusion.yaml.interpolator_wandb_ckpt_filename
         )
 
+        log.info("Successfully loaded interpolator.") 
         # freeze the interpolator (and set to eval mode)
         freeze_model(self.interpolator)
 
