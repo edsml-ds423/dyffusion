@@ -51,6 +51,8 @@ def get_run_api(
         entity = wandb.api.default_entity
 
     run_path = run_path or f"{entity}/{project}/{run_id}"
+    # run_id needs to be in wandb, not local.
+    # run_path = 'ds423/DYffusion/w0x3b1rq'
     return get_api(wandb_api).run(run_path)
 
 
@@ -147,14 +149,19 @@ def get_wandb_ckpt_name(run_path: str, epoch: Union[str, int] = "best") -> str:
         epoch, int
     ), f"epoch must be 'best', 'last' or an int, but is {epoch}"
     run_api = get_run_api(run_path=run_path)
+    id = run_path.split('/')[-1]
     ckpt_files = [f.name for f in run_api.files() if f.name.endswith(".ckpt")]
+    #TODO: is this broken?
     if epoch == "best":
         if "best.ckpt" in ckpt_files:
             ckpt_filename = "best.ckpt"
         else:
             raise ValueError(f"Could not find best.ckpt in {ckpt_files}")
-    elif "last.ckpt" in ckpt_files and epoch == "last":
-        ckpt_filename = "last.ckpt"
+    elif f"{id}/last.ckpt" in ckpt_files and epoch == "last":
+        # handling epoch == 'last'
+        ckpt_filename = f"{id}/last.ckpt"
+    # elif "last.ckpt" in ckpt_files and epoch == "last":
+        # ckpt_filename = "last.ckpt"
     else:
         if len(ckpt_files) == 0:
             raise ValueError(f"Wandb run {run_path} has no checkpoint files (.ckpt) saved in the cloud!")
@@ -213,8 +220,12 @@ def restore_model_from_wandb_cloud(
     else:
         if ckpt_filename is None:
             ckpt_filename = get_wandb_ckpt_name(run_path, **kwargs)
-            ckpt_filename = ckpt_filename.split("/")[-1]  # in case the file contains local dir structure
+            # ckpt_filename = ckpt_filename.split("/")[-1]  # in case the file contains local dir structure
         # IMPORTANT ARGS replace=True: see https://github.com/wandb/client/issues/3247
+        
+        #TODO: need to fix this.
+        # ckpt_filename = "best-val_5ens_mems_ipol_avg_crps.ckpt"
+        # ckpt_filename = "qatvsa9g/last.ckpt"
         best_model_fname = wandb.restore(ckpt_filename, run_path=run_path, replace=True, root=os.getcwd()).name
     # rename best_model_fname to add a unique prefix to avoid conflicts with other runs
     # (e.g. if the same model is reloaded twice)
@@ -357,6 +368,7 @@ def reload_checkpoint_from_wandb(
     run_path = f"{entity}/{project}/{run_id}"
     config = load_hydra_config_from_wandb(run_path, override_key_value=override_key_value)
 
+    # local_checkpoint_path = "results/checkpoints/w0x3b1rq/last.ckpt"
     ckpt_path = restore_model_from_wandb_cloud(
         run_path, local_checkpoint_path, epoch=epoch, ckpt_filename=ckpt_filename
     )
