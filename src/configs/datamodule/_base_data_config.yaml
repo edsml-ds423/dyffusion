@@ -5,15 +5,16 @@
 #             $data_dir/oisstv2   or   $data_dir/physical-nn-benchmark
 #   So, if you adhere to this naming, you can keep data_dir to point to their parent dir. By default, ``$HOME/data``
 data_dir: "${oc.env:HOME}/git_uni/dyffusion/data"
+# data_dir: "${oc.env:HOME}/dyffusion/data"
 
 # --> non-optional edits:
 # overwrite $datamodule.config params.
-batch_size: 2    # batch size for training
+batch_size: 12    # batch size for training
 eval_batch_size: ${datamodule.batch_size} # batch size for validation/testing (larger might be faster, but uses more RAM)
 num_workers: 4              # number of workers for data loading  (-1 means all available CPUs)
 pin_memory: True
 drop_last: False
 verbose: ${verbose}
 window: 1
-horizon: 8                # number of time steps to predict ahead
+horizon: 4                # number of time steps to predict ahead
 # seed_data: 77           # random seed for reproducibility of random data split (different to the one for training)

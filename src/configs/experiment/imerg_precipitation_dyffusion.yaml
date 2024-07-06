@@ -12,8 +12,8 @@ defaults:
 name: "ImergPrecipitation-MH${datamodule.horizon}-DYffusion"
 
 diffusion:
-  interpolator_run_id: g310idyq    # please update
-  additional_interpolation_steps: 10  # k
+  interpolator_run_id: "qatvsa9g"    # please update
+  additional_interpolation_steps: 0  # k
   refine_intermediate_predictions: False
   forward_conditioning: "data+noise"
 

@@ -6,8 +6,10 @@
 defaults:
   - _self_
   - trainer: default.yaml                # Use trainer=ddp to run on multiple GPUs
+  
   # - model: unet_simple_navier_stokes.yaml
   - model: unet_resnet.yaml
+
   - diffusion: null
   # - diffusion: dyffusion.yaml
   # - datamodule: physical_systems.yaml    #  Physical systems benchmark datasets
@@ -19,9 +21,10 @@ defaults:
   # - module: forecasting_multi_horizon_dyffusion.yaml
   # - module: forecasting_multi_horizon_time_conditioned
 
-  # - callbacks: wandb.yaml  # or use default.yaml
-  - callbacks: default.yaml
-  - logger: none.yaml # wandb.yaml     # set logger here or use command line (e.g. `python train.py logger=wandb`)
+  - callbacks: wandb.yaml  # or use default.yaml
+  # - callbacks: default.yaml
+
+  - logger: wandb.yaml  # none.yaml # wandb.yaml     # set logger here or use command line (e.g. `python train.py logger=wandb`)
 
   # modes are special collections of config options for different purposes, e.g. debugging
   - mode: default.yaml
@@ -35,7 +38,6 @@ defaults:
 
   # default optimizer is AdamW (better than Adam with weight decay)
   # - override optimizer@module.optimizer: adam.yaml
-
 
 # Note: hydra.runtime.cwd points to the original working dir.
 # ${hydra:runtime.cwd} is the path to original working directory

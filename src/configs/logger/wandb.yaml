@@ -7,7 +7,7 @@ wandb:
   name: null   # will be automatically set to the name of the run (plus timestamp, etc.)
   tags: []
   notes: "..."
-  project: "DYffusion"
+  project: "DYffusion"  # name of the project in wandb.
   group: ""
   resume: "allow"
   reinit: True
