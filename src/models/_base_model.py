@@ -68,6 +68,7 @@ class BaseModel(LightningModule):
         self.datamodule_config = datamodule_config
 
         # Get the loss function
+        #TODO: maybe can add weirner loss here. Or some mash up of SSIM and MSE??
         self.criterion = get_loss(loss_function)
         self._channel_dim = None
         self.ema_scope = None  # EMA scope for the model. May be set by the BaseExperiment instance
