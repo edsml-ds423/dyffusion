@@ -226,6 +226,37 @@ class AbstractMultiHorizonForecastingExperiment(BaseExperiment, ABC):
             log_dict[f"{split}/{self.horizon_name}_avg/mse"] = avg_mse_tracker
             self.log_dict(log_dict, on_step=False, on_epoch=True, **log_kwargs)  # log metric objects
 
+        # # print statement.
+        # import matplotlib.pyplot as plt
+        # from datetime import datetime 
+        # fig, axs = plt.subplots(4, 9, figsize=(24, 7))
+        # _batch = 1
+        # plt.rc('xtick', labelsize=2) 
+        # plt.rc('ytick', labelsize=2)
+        # # entire sequence
+        # for i in range(0, 9):
+        #     axs[0, i].imshow(batch["dynamics"][_batch, i, 0, :, :])
+        #     axs[0, i].set_title(f"x{i}", fontsize=8)
+        #     if i < 8:
+        #         axs[2, i].axis("off")
+        #         axs[3, i].axis("off")
+        # # preds
+        # for j in range(0, 5):
+        #     axs[1, j+4].imshow(preds[j, _batch, 0, :, :])
+        #     axs[1, j+4].set_title(f"x0_pred", fontsize=8)
+        #     if j < 4:
+        #         axs[1, j].axis("off")
+        # # mean pred.
+        # axs[2, 8].imshow(preds.mean(dim=0)[_batch, 0, :, :])
+        # axs[2, 8].set_title("avg pred.", fontsize=8)
+
+        # # target
+        # axs[3, 8].imshow(targets[_batch, 0, :, :])
+
+        # plt.tight_layout()
+        # plt.subplots_adjust(wspace=0.1, hspace=0.1)
+        # plt.savefig(f"testing_{_batch}_{str(datetime.now().time()).replace(':', '_').replace('.', '_')}")
+
         return return_dict
 
     def test_step(self, batch: Any, batch_idx: int, dataloader_idx: int = None, **kwargs):
