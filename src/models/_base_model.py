@@ -15,6 +15,9 @@ from src.utilities.utils import (
     get_loss,
 )
 
+from src.experiment_types.loss import WienerLoss
+from src.experiment_types.auxiliary import get_laplacian
+
 
 class BaseModel(LightningModule):
     r"""This is a template base class, that should be inherited by any stand-alone ML model.
@@ -127,6 +130,14 @@ class BaseModel(LightningModule):
             return_predictions (bool): Whether to return the predictions or not. Default: False.
                                     Note: this will return all the predictions, not just the masked ones (if any).
         """
+
+        # overwrite self.criterion with WeinerLoss
+        self.criterion = WienerLoss(filter_dim=self.num_output_channels + 1,
+                                    penalty_function=get_laplacian(dim=self.num_output_channels + 1),
+                                    std=1e-1,
+                                    epsilon=250.,
+                                    filter_scale=2
+                                    )
         # Predict
         predictions = self(inputs, condition=condition, **kwargs)
         # Compute loss
