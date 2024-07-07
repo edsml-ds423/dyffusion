@@ -40,8 +40,12 @@ class MyTensorDataset(Dataset[Dict[str, Tensor]]):
 
         arr_log_lin_norm = np.log(arr_lin_norm + 1)
         """
+
+        _min = 0.0
+        _max = 3.230964096613462
+
         scale = (b - a) / (d - c)
-        return np.log1p(((arr - c) * scale) + a)
+        return ((np.log1p(((arr - c) * scale) + a)) - _min) / (_max - _min)
 
     @staticmethod
     def reverse_log_linear_norm(
@@ -53,6 +57,19 @@ class MyTensorDataset(Dataset[Dict[str, Tensor]]):
         """
         scale = (d - c) / (b - a)
         return ((np.expm1(arr) - a) * scale) + c
+    
+
+    @staticmethod
+    def min_max_norm(
+        arr: Tensor, _min: float, _max: float) -> Tensor:
+        """"""
+        return (arr - _min) / (_max - _min)
+    
+    @staticmethod
+    def reverse_min_max_norm(
+        arr: Tensor, _min: float, _max: float) -> Tensor:
+        """"""
+        return (arr * (_max - _min)) + _min
 
     @staticmethod
     def convert_to_tensor(item):
@@ -84,6 +101,7 @@ class MyTensorDataset(Dataset[Dict[str, Tensor]]):
         log.info(f"creating {dataset_id} tensor dataset.")
         self.normalize = kwargs.get("norm", False)
         self.train_percentiles = kwargs.get("percentiles", None)
+        self.minmax = kwargs.get("min_max", None)
 
         with ThreadPoolExecutor() as executor:
             # create a {key: tensor} from {key: numpy} dict.
@@ -102,7 +120,8 @@ class MyTensorDataset(Dataset[Dict[str, Tensor]]):
                     "Percentiles must be provided in kwargs when normalize is True."
                 )
             log.info("normalizing data using 1st and 99th training data percentiles.")
-            log.info(f"1st: {self.train_percentiles['1']}, 99th: {self.train_percentiles['99']}")
+            log.info(f"1st: {self.train_percentiles['1']}, 99th: {self.train_percentiles['99']}.")
+            log.info(f"applying min max norm w/ min={self.minmax[0]}, max={self.minmax[-1]}.")
             self._normalize_tensors()
 
     def _normalize_tensors(self):
@@ -112,6 +131,13 @@ class MyTensorDataset(Dataset[Dict[str, Tensor]]):
                 c=self.train_percentiles["1"],
                 d=self.train_percentiles["99"],
             )
+            
+            # # applying min max to the linear log norm.
+            # self.tensors[key] = self.min_max_norm(
+            #     arr=self.log_linear_norm(arr=tensor, c=self.train_percentiles["1"], d=self.train_percentiles["99"]),
+            #     _min=self.minmax[0], 
+            #     _max=self.minmax[1],
+            # )
 
     def __getitem__(self, index):
         return {key: tensor[index] for key, tensor in self.tensors.items()}

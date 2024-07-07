@@ -1,0 +1,3 @@
+Collecting torch
+  Obtaining dependency information for torch from https://files.pythonhosted.org/packages/4a/0e/e4e033371a7cba9da0db5ccb507a9174e41b9c29189a932d01f2f61ecfc0/torch-2.2.2-cp312-none-macosx_11_0_arm64.whl.metadata
+  Downloading torch-2.2.2-cp312-none-macosx_11_0_arm64.whl.metadata (25 kB)

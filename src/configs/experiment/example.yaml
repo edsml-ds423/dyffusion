@@ -22,7 +22,7 @@ name: "example"
 
 trainer:
   min_epochs: 1
-  max_epochs: 50
+  max_epochs: 10
   # gradient_clip_val: 5
 
 # datamodule:

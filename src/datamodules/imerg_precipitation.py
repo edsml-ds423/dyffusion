@@ -53,6 +53,7 @@ class IMERGPrecipitationDataModule(BaseDataModule):
         self.normalization_hparams = {
             "norm": True,
             "percentiles": {"1": 0.0, "99": 5.690000057220459},
+            "min_max": [0.0, 3.230964096613462],
         }
 
         # Set the temporal slices for the train, val, and test sets. lims (not inclusive).

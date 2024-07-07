@@ -19,7 +19,8 @@ model:
 module:
   enable_inference_dropout: True
   optimizer:
-    lr: 3e-4
+    # lr: 3e-4
+    lr: 1e-3
 
 logger:
   wandb:

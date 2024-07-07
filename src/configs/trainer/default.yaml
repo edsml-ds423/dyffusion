@@ -5,7 +5,7 @@ devices: "auto"    # -1 for all available GPUs. If you want to use CPU, set to 0
 strategy: "auto"
 
 min_epochs: 1
-max_epochs: 50
+max_epochs: 10
 
 gradient_clip_val: 1.0        # Gradient clipping at 1.0 of the norm
 accumulate_grad_batches: 1    # Accumulate gradients on k batches

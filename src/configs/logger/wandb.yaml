@@ -9,7 +9,7 @@ wandb:
   notes: "..."
   project: "DYffusion"  # name of the project in wandb.
   group: ""
-  resume: "allow"
+  resume: null # "allow"
   reinit: True
   mode: online              # disabled  # disabled for no wandb logging
   save_dir: ${work_dir}/

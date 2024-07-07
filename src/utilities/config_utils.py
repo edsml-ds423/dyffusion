@@ -271,7 +271,8 @@ def extras(
             elif if_wandb_run_already_exists in [None, "ignore"]:
                 wandb_status = "resume"
             else:
-                wandb_status = "???"
+                wandb_status = "new"
+                # wandb_status = "???"
 
             if config.logger.wandb.get("id") is None:
                 # no wandb id has been assigned yet
@@ -449,6 +450,7 @@ def check_config_values(config: DictConfig):
         if USE_WANDB:
             if "callbacks" in config and config.callbacks.get("model_checkpoint"):
                 wandb_model_run_id = config.logger.wandb.get("id")
+                # wandb_model_run_id = "w0x3b1rq"
                 d = config.callbacks.model_checkpoint.dirpath
                 if wandb_model_run_id is not None and wandb_model_run_id not in d:
                     # Save model checkpoints to special folder <ckpt-dir>/<wandb-run-id>/

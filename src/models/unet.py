@@ -269,6 +269,40 @@ class Unet(BaseModel):
         return self.get_block(self.hparams.dim, self.hparams.dim, dropout=dropout)
 
     def forward(self, x, time=None, condition=None, return_time_emb: bool = False):
+        # import numpy as np
+        # def reverse_log_linear_norm(arr):
+        #     _min = 0.0
+        #     _max = 3.230964096613462
+        #     c = 0.0
+        #     d = 5.690000057220459
+        #     a = 0
+        #     b = 1
+        #     scale = (d - c) / (b - a)
+        #     return (((np.expm1((arr * (_max - _min)) + _min)) - a) * scale) + c
+
+        # import matplotlib.pyplot as plt
+        # import seaborn as sns
+        # x_reversed = reverse_log_linear_norm(x)
+        # b = 8
+        # fig, ax  = plt.subplots(2, 4, figsize=(12, 5))
+        # ax[0, 0].imshow(x[b, 0, :, :])
+        # ax[0, 1].imshow(x[b, 1, :, :])
+        # ax[0, 0].axis("off")
+        # ax[0, 1].axis("off")
+        # sns.kdeplot(x[b, 0, :, :].flatten(), ax=ax[0, 2])
+        # sns.kdeplot(x[b, 1, :, :].flatten(), ax=ax[0, 3])
+        # ax[0, 0].set_title("x0_normed", fontsize=8)
+        # ax[0, 1].set_title("xh_normed", fontsize=8)
+        # ax[1, 0].imshow(x_reversed[b, 0, :, :])
+        # ax[1, 1].imshow(x_reversed[b, 1, :, :])
+        # ax[1, 0].axis("off")
+        # ax[1, 1].axis("off")
+        # sns.kdeplot(x_reversed[b, 0, :, :].flatten(), ax=ax[1, 2])
+        # sns.kdeplot(x_reversed[b, 1, :, :].flatten(), ax=ax[1, 3])
+        # ax[1, 0].set_title("x0_raw", fontsize=8)
+        # ax[1, 1].set_title("xh_raw", fontsize=8)
+        # plt.savefig("norm versus real")
+
         if _print:    print(f"\n*** forward pass @ t={time} ***")
         if self.num_conditional_channels > 0:
             # condition = default(condition, lambda: torch.zeros_like(x))
@@ -340,6 +374,10 @@ class Unet(BaseModel):
             # x = F.interpolate(x, orig_x_shape, mode='bilinear', align_corners=False)
             x = F.interpolate(x, size=orig_x_shape, mode=self.hparams.outer_sample_mode)
 
+        # apply sigmoid to ensure [0, 1] outputs.
+        x = nn.Sigmoid()(x)
+
         if return_time_emb:
             return x, t
+
         return x
